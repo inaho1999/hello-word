@@ -2,6 +2,7 @@
 import multiprocessing as mlti
 import os
 
+import cv2
 import qi
 import argparse
 import sys
@@ -120,6 +121,85 @@ def getImange(data):
             video.unsubscribe(topcamera)
             break
 
+def findmax(listp):
+    max = 0
+    for maxi in listp:
+        if max < maxi:
+            max = maxi
+    indexi = np.where(listp == max)
+    return max, indexi
+
+
+def find_person(image):
+    classid = []
+    with open('coco.names', 'r') as coco:
+        print('typeof', type(coco))
+        for id in coco:
+            classid.append(id.replace('\n', ''))
+    coco.close()
+    # read network from yolo
+    net = cv2.dnn.readNetFromDarknet('yolov4-tiny.cfg', 'yolov4-tiny.weights')
+    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+    net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+    # size and confidence threshold
+    size = 416
+    conf_threshold = 0.9
+    nms_threshold = 0.7
+    # size of image
+    frame_height = image.shape[0]
+    frame_width = image.shape[1]
+    # find net in image
+    blob = cv2.dnn.blobFromImage(image, 1.0 / 255, (size, size), [0, 0, 0], swapRB=False, crop=False)
+    net.setInput(blob)
+    detections = net.forward()
+
+    bbox = []
+    confs = []
+    new_classid = []
+    cox = None
+    coy = None
+    for detection in detections:
+        if detection[5] > conf_threshold:
+            maxi, index = findmax(detection[5:])
+            # index_of_coco = index[0][0]
+            # print(f'detection: {detection}')
+            # print(f'max:{max}, index:{index[0][0]}, name:{classid[index_of_coco]} ')
+            toado = detection[0:4]
+            w, h = int(detection[2] * frame_width), int(detection[3] * frame_height)
+            x, y = int(detection[0] * frame_width - w / 2), int(detection[1] * frame_height - h / 2)
+            cox = x + w/2
+            coy = y + h/2
+            print('toado: {0}, {1}, {2}, {3}'.format(x, y, w, h))
+            bbox.append([x, y, w, h])
+            confs.append(float(maxi))
+            new_classid.append('person')
+            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0))
+            label = 'person'
+            label = label + ': ' + ('%.4f' % maxi)
+            label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, thickness=3)
+            cv2.rectangle(image, (x, y - label_size[1]),
+                          (x + label_size[0], y + base_line),
+                          (255, 255, 255), cv2.FILLED)
+            cv2.putText(image, label.upper(), (x, y),
+                        cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 255), thickness=3)
+            break
+    # indices = cv2.dnn.NMSBoxes(bbox, confs, conf_threshold, nms_threshold)
+    # print('indices: {0}'.format(indices))
+    # if len(indices) > 0:
+    #     for i in indices:
+    #         box = bbox[i]
+    #         x, y, w, h = box[0], box[1], box[2], box[3]
+    #         cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0))
+    #         label = 'person'
+    #         label = label + ': ' + ('%.4f' % confs[i])
+    #         label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, thickness=3)
+    #         cv2.rectangle(image, (x, y - label_size[1]),
+    #                       (x + label_size[0], y + base_line),
+    #                       (255, 255, 255), cv2.FILLED)
+    #         cv2.putText(image, label.upper(), (x, y),
+    #                     cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 255), thickness=3)
+    return cox, coy
+
 def aroung_ball(motion_service, angle, radius):
     count = 0
     angle = math.radians(angle)
@@ -128,6 +208,7 @@ def aroung_ball(motion_service, angle, radius):
         y = radius*math.cos(angle)
         motion_service.moveTo(x, -y, angle)
         count += 1
+        time.sleep(1)
 
 def rotate_head(session, data):
     motion_service = session.service('ALMotion')
@@ -153,59 +234,41 @@ def rotate_head(session, data):
         motion_service.moveTo(0, 0, data[0])
         #motion.waitUntilMoveIsFinished()
     elif abs(data[0]) <= math.pi / 180 and data[3] == 1100:
-
         print('đi đến vị trí bóng, camera: {0}'.format(data[5]))
 
         if data[5] == 1:
-            #     print("chuẩn bị sút bóng")
-            #     motion.moveTo(0.1, 0, 0)
-            #     motion.waitUntilMoveIsFinished()
-            #     motion.moveTo(0, 0.05, 0)
-            #     motion.waitUntilMoveIsFinished()
-            #     print('sút bóng')
-            #     kb.main(motion)
-            #     motion.waitUntilMoveIsFinished()
-
             # camera 1
             focal_length_1 = 903.752521834
             # radius of real ball
             radius_real = 0.05
+            # tìm khoảng cách đến bóng
             distance = radius_real * focal_length_1 / data[2]
             bottom = motion_service.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
             distance = math.sqrt(distance ** 2 - bottom[2] ** 2)
             print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance - 0.1, data[5]))
+            # di chuyển đến bóng
             motion_service.moveTo(distance, 0, 0)
             motion_service.waitUntilMoveIsFinished()
             time.sleep(1)
+            # tìm khoảng cách sau khi di chuyển
             bottom = motion_service.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
             distance = radius_real * focal_length_1 / data[2]
             distance = math.sqrt(distance ** 2 - bottom[2] ** 2)
+            # di chuyển xung quanh bóng
             aroung_ball(motion_service, 30, distance)
+            # dịch chuyển để sút bóng
             motion_service.moveTo(0, 0.05, 0)
             motion_service.waitUntilMoveIsFinished()
             kb.main(motion_service)
-            motion_service.waitUntilMoveIsFinished()
-            # if data[2] > 470:
-            #     motion.moveTo(0.1, 0, 0)
-            #     motion.waitUntilMoveIsFinished()
-            #     motion.moveTo(0, 0.05, 0)
-            #     motion.waitUntilMoveIsFinished()
-            #     kb.main(motion)
-            #     motion.waitUntilMoveIsFinished()
-        elif data[5] == 0:
-            # if data[2] > 470:
-            #     motion.moveTo(0.1, 0, 0)
-            #     motion.waitUntilMoveIsFinished()
 
-            # camera 0
+        elif data[5] == 0:
             focal_length_0 = 667.140758904
             top = motion_service.getPosition('CameraTop', motion.FRAME_ROBOT, True)
-            focal_length_0 = 604.2
             # radius of real ball
             radius_real = 0.05
             distance = focal_length_0*radius_real/data[2]
             distance = math.sqrt(distance ** 2 - top[2] ** 2)
-            print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, data[5]))
+            print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, int(data[5])))
             motion_service.moveTo(distance, 0, 0)
             motion_service.waitUntilMoveIsFinished()
 
@@ -226,7 +289,7 @@ if __name__ == "__main__":
         print ("Can't connect to Naoqi at ip \"" + args.ip + "\" on port " + str(args.port) + ".\n"
                                                                                               "Please check your script arguments. Run with -h option for help.")
         sys.exit(1)
-    arr_object = mlti.Array('d', 6)
+    arr_object = mlti.Array('d', 8)
     arr_object[4] = 1
     '''
     data[0]: góc quay hiệu chỉnh
