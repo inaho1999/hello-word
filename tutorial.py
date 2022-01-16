@@ -13,7 +13,6 @@ import almath
 import almotion_wbKick as kb
 import time
 import motion
-from pynput import keyboard
 
 
 def getImange(data):
@@ -31,25 +30,29 @@ def getImange(data):
     topcamera = video.subscribe("python", resolution, colorSpace, fps)
     data[1] = 0
     data[5] = 0
-    #camera 0
-    focal_length_0 = 667.140758904
-    # camera 1
-    focal_length_1 = 903.752521834
+
     while True:
         # get image
         result_top = video.getImageRemote(topcamera)
+        # if cant capture image
         if result_top == None:
             print 'cannot capture.'
+        # if no image data
         elif result_top[6] == None:
             print 'no image data string.'
+
         else:
+            # convert image to form that opencv can read
             image_top = (np.reshape(np.frombuffer(result_top[6],
                                                   dtype='%iuint8' % result_top[2]),
                                     (result_top[1], result_top[0], result_top[2])))
+            # hsv image
             hsv = cv.cvtColor(image_top, cv.COLOR_BGR2HSV)
+            # binary image
             mask = cv.inRange(hsv, (0, 100, 201), (0, 255, 255))
+            # find contour if red ball
             contour, hier = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-
+            # found red ball
             if len(contour) > 0:
                 data[4] = 1
                 cnt = contour[0]
@@ -61,15 +64,15 @@ def getImange(data):
                 cy = int(y) # trọng tâm theo y
                 cox1 = x - w/2
                 coy1 = y - h /2
-                if (coy1 >= 4) and video.getActiveCamera(topcamera) == 0:
-                    video.setActiveCamera(1)
-                    data[5] = 1
-                    #time.sleep(3)
-
-                if coy1 <= 20 and video.getActiveCamera(topcamera) == 1:
-                    video.setActiveCamera(0)
-                    data[5] = 0
-                    #time.sleep(3)
+                # if (coy1 >= 4) and video.getActiveCamera(topcamera) == 0:
+                #     video.setActiveCamera(1)
+                #     data[5] = 1
+                #     #time.sleep(3)
+                #
+                # if coy1 <= 20 and video.getActiveCamera(topcamera) == 1:
+                #     video.setActiveCamera(0)
+                #     data[5] = 0
+                #     #time.sleep(3)
 
                 cv.rectangle(image_top, (int(cox1), int(coy1)), (int(cox1 + w), int(coy1 + h)), (0, 0, 255), 2)
                 gocquay = (abs(float(
@@ -77,7 +80,7 @@ def getImange(data):
                 # dưới dạng radian
                 if cx > 320:
                     gocquay = - gocquay
-                #print('gocquay:_{0}; cx:_{1}; cy:_{2}'.format(gocquay * 180, cx, cy))
+                # print('gocquay:_{0}; cx:_{1}; cy:_{2}'.format(gocquay * 180, cx, cy))
 
                 cv.circle(image_top, (cx, cy), 10, (220, 0, 255), 1)
                 data[0] = gocquay
@@ -165,15 +168,21 @@ def rotate_head(session, data):
 
             # camera 1
             focal_length_1 = 903.752521834
-            distance = 0.05 * focal_length_1 / data[2]
+            # radius of real ball
+            radius_real = 0.05
+            distance = radius_real * focal_length_1 / data[2]
             bottom = motion_service.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
             distance = math.sqrt(distance ** 2 - bottom[2] ** 2)
             print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance - 0.1, data[5]))
-            motion_service.moveTo(distance - 0.1, 0, 0)
+            motion_service.moveTo(distance, 0, 0)
             motion_service.waitUntilMoveIsFinished()
+            time.sleep(1)
+            bottom = motion_service.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
+            distance = radius_real * focal_length_1 / data[2]
+            distance = math.sqrt(distance ** 2 - bottom[2] ** 2)
+            aroung_ball(motion_service, 30, distance)
             motion_service.moveTo(0, 0.05, 0)
             motion_service.waitUntilMoveIsFinished()
-            aroung_ball(motion_service, 30, distance)
             kb.main(motion_service)
             motion_service.waitUntilMoveIsFinished()
             # if data[2] > 470:
@@ -192,7 +201,9 @@ def rotate_head(session, data):
             focal_length_0 = 667.140758904
             top = motion_service.getPosition('CameraTop', motion.FRAME_ROBOT, True)
             focal_length_0 = 604.2
-            distance = focal_length_0*0.05/int(data[2])
+            # radius of real ball
+            radius_real = 0.05
+            distance = focal_length_0*radius_real/data[2]
             distance = math.sqrt(distance ** 2 - top[2] ** 2)
             print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, data[5]))
             motion_service.moveTo(distance, 0, 0)
