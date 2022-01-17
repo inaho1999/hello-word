@@ -11,8 +11,10 @@ import vision_definitions
 import argparse
 from pynput import keyboard
 
+
 def none(x):
     pass
+
 
 def getImange(session):
     # session = qi.Session()
@@ -25,7 +27,7 @@ def getImange(session):
     # redball_detection = session.service('ALRedBallDetection')
     # tracker = session.service('ALTracker')
     # targetName = 'RedBall'
-    # diameterOfBall = 0.05
+    # diameterOfBall = radius_real
     # tracker.registerTarget(targetName, diameterOfBall)
     # mode = 'Move'
     # tracker.setMode(mode)
@@ -34,26 +36,31 @@ def getImange(session):
     # service motion and posture
     motion_service = session.service('ALMotion')
     posture = session.service('ALRobotPosture')
-    #motion_service.wakeUp()
+    # motion_service.wakeUp()
     # bottom = motion_service.getPosition('CameraTop', motion.FRAME_ROBOT, False)
     # print('Camera position {0}'.format(bottom))
-    #posture.goToPosture('StandInit', 1)
+    # posture.goToPosture('StandInit', 1)
 
     # service video device
     video = session.service('ALVideoDevice')
     resolution = vision_definitions.kVGA
     colorSpace = vision_definitions.kBGRColorSpace
     fps = 20
-    video.setActiveCamera(0)
+    video.setActiveCamera(1)
     topcamera = video.subscribe("python", resolution, colorSpace, fps)
     # data[1] = 0
     # data[5] = 0
-    #camera 0
-    focal_length_0 = 667.140758904
+    # camera 0
+    # focal_length_0 = 667.140758904
+    focal_length_0 = 705.196598337
     # camera 1
-    focal_length_1 = 903.752521834
+    focal_length_1 = 895.697546638
+    # focal_length_1 = 705.196598337
     winnamed = 'camera'
     cv2.namedWindow(winnamed)
+    motion_service.wakeUp()
+    motion_service.angleInterpolationWithSpeed('Head', [0, 0.30], 0.2)
+    radius_real = 0.05
     # (hmin, hmax, smin, smax, vmin, vmax) = (0, 255, 0, 255, 0, 255)
     # cv2.createTrackbar('hmin', winnamed, 0, 255, none)
     # cv2.createTrackbar('hmax', winnamed, 0, 255, none)
@@ -76,44 +83,50 @@ def getImange(session):
                                                   dtype='%iuint8' % result_top[2]),
                                     (result_top[1], result_top[0], result_top[2])))
             hsv = cv.cvtColor(image_top, cv.COLOR_BGR2HSV)
+
             # hmin = cv.getTrackbarPos('hmin', winnamed)
             # hmax = cv.getTrackbarPos('hmax', winnamed)
             # smin = cv.getTrackbarPos('smin', winnamed)
             # smax = cv.getTrackbarPos('smax', winnamed)
             # vmin = cv.getTrackbarPos('vmin', winnamed)
             # vmax = cv.getTrackbarPos('vmax', winnamed)
-            mask = cv.inRange(hsv, (0, 100, 201), (0, 255, 255))
-            contour, hier = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-            if len(contour) > 0:
-                # data[4] = 1
-                cnt = contour[0]
-                (x, y), radius = cv.minEnclosingCircle(cnt)
-                print('x: {0}; y: {1}, radius: {2}'.format(int(x), int(y), int(radius)))
-                cx = int(x)  # trọng tâm theo x
-                # print("")
-                cy = int(y)  # trọng tâm theo y
-                if cy > 470 and video.getActiveCamera(topcamera) == 0:
-                    video.setActiveCamera(1)
-                    # data[5] = 1
-                if cy < 10 and video.getActiveCamera(topcamera) == 1:
-                    video.setActiveCamera(0)
-                    # data[5] = 0
-                # Tính khoảng cách
-                distance = 0.05*focal_length_0/radius
-                print('Khoảng cách đến camera: {0}'.format(distance))
-                bottom = motion_service.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
-                top = motion_service.getPosition('CameraTop', motion.FRAME_ROBOT, True)
-                if video.getActiveCamera() == 0:
-                    distance = math.sqrt(distance**2-top[2]**2)
-                elif video.getActiveCamera() == 1:
-                    distance = math.sqrt(distance**2-bottom[2]**2)
-                print('Khoảng cách hiện tại: {0}'.format(distance))
+            # # camera bottom (0, 146, 127), (197, 255, 255)
+            # # camera top (142, 192, 56), (200, 255, 255)
+            # # camera webots (0, 23, 102), (17, 255, 255)
+            # # camera webots (0, 0, 0), (5, 255, 255)
+            # mask = cv.inRange(hsv, (hmin, smin, vmin), (hmax, smax, vmax))
+            mask = cv.inRange(hsv, (0, 0, 0), (5, 255, 255))
+            contours, hier = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+            for contour in contours:
+                if cv2.contourArea(contour) > 50:
+                    # data[4] = 1
+                    cnt = contour
+                    (x, y), radius = cv.minEnclosingCircle(cnt)
+                    print('x: {0}; y: {1}, radius: {2}'.format(int(x), int(y), int(radius)))
+                    cx = int(x)  # trọng tâm theo x
+                    # print("")
+                    cy = int(y)  # trọng tâm theo y
+                    # Tính khoảng cách
+                    distance = radius_real * focal_length_0 / int(radius)
+                    print('Khoảng cách đến camera: {0}'.format(distance))
+                    bottom = motion_service.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
+                    print('camera bottom height: {0}'.format(bottom[2]))
+                    top = motion_service.getPosition('CameraTop', motion.FRAME_ROBOT, True)
+                    if video.getActiveCamera() == 0:
+                        distance = radius_real * focal_length_0 / int(radius)
+                        distance = math.sqrt(distance ** 2 - top[2] ** 2)
+                    elif video.getActiveCamera() == 1:
+                        distance = radius_real * focal_length_1 / int(radius)
+                        if distance ** 2 - bottom[2] ** 2 > 0:
+                            distance = math.sqrt(distance ** 2 - bottom[2] ** 2)
+                        else:
+                            distance = -1
+                    print('Khoảng cách hiện tại: {0}'.format(distance))
 
-
-                cv.circle(image_top, (cx, cy), int(radius), (0, 0, 255), 2)
-                gocquay = (abs(float(
-                    cx) - 320.0)) / 640.0 * 67.4 * almath.TO_RAD  # Tính góc quay cần thiết của robot
-            cv.imshow(winnamed, mask)
+                    cv.circle(image_top, (cx, cy), int(radius), (0, 255, 255), 2)
+                    gocquay = (abs(float(
+                        cx) - 320.0)) / 640.0 * 67.4 * almath.TO_RAD  # Tính góc quay cần thiết của robot
+            cv.imshow(winnamed, image_top)
             # if tracker.isActive():
             #     print('Tracker đang hoạt động')
 
@@ -131,6 +144,7 @@ def getImange(session):
             video.unsubscribe(topcamera)
             # tracker.stopTracker()
             break
+
 
 def turnaround():
     pass
