@@ -82,7 +82,7 @@ class cameraNao:
                 self.data[5] = 0
                 self.data[4] = 0
 
-            return self.image
+        return self.image
 
     def camera(self):
         self.findColor()
