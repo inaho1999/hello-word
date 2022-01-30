@@ -54,7 +54,7 @@ def getImange(session):
     # focal_length_0 = 667.140758904
     focal_length_0 = 705.196598337
     # camera 1
-    focal_length_1 = 895.697546638
+    focal_length_1 = 806.449169691
     # focal_length_1 = 705.196598337
     winnamed = 'camera'
     cv2.namedWindow(winnamed)
@@ -94,8 +94,9 @@ def getImange(session):
             # # camera top (142, 192, 56), (200, 255, 255)
             # # camera webots (0, 23, 102), (17, 255, 255)
             # # camera webots (0, 0, 0), (5, 255, 255)
+            # # camera webots (0, 129, 204), (0, 255, 255)
             # mask = cv.inRange(hsv, (hmin, smin, vmin), (hmax, smax, vmax))
-            mask = cv.inRange(hsv, (0, 0, 0), (5, 255, 255))
+            mask = cv.inRange(hsv, (0, 129, 204), (0, 255, 255))
             contours, hier = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
             for contour in contours:
                 if cv2.contourArea(contour) > 50:

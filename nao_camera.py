@@ -8,7 +8,7 @@ import argparse
 
 
 class cameraNao:
-    def __init__(self, ip, port):
+    def __init__(self, ip='127.0.0.1', port=9559):
         self.ip = ip
         self.port = port
         self.resolution = vision_definitions.kVGA

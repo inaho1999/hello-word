@@ -15,6 +15,11 @@ import almotion_wbKick as kb
 import time
 import motion
 
+def polyfit(walk):
+    a1 = 1.318649524
+    a0 = -0.009062442
+    walk = walk*a1 + a0
+    return walk
 
 def distance_ball(height, radius_pixel, radius_real, focal_length):
     distance = radius_real * focal_length / radius_pixel
@@ -81,7 +86,7 @@ def getImange(data):
             if len(contours) > 0:
                 for contour in contours:
                     if cv2.contourArea(contour) > 50:
-                        data[4] = 1
+                        data[4] = 0
                         cnt = contour
                         (x, y), radius = cv.minEnclosingCircle(cnt)
                         x1, y1, w, h = cv.boundingRect(cnt)
@@ -111,13 +116,13 @@ def getImange(data):
                     video.setActiveCamera(1)
                     data[5] = 1
                 
-            else:
+            elif data[7] == 0:
                 data[3] = -1100  # robot không tìm thấy bóng
-                if video.getActiveCamera() == 1:
+                if data[4] == 0 and video.getActiveCamera() == 1:
                     video.setActiveCamera(0)
                     data[5] = 0
 
-                if data[4] == 9:
+                if data[4] == 8:
                     if video.getActiveCamera(topcamera) == 1:
                         video.setActiveCamera(0)
                         data[4] += 1
@@ -211,31 +216,31 @@ def find_person(image):
             cv2.putText(image, label.upper(), (x, y),
                         cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 255), thickness=3)
             break
-    # indices = cv2.dnn.NMSBoxes(bbox, confs, conf_threshold, nms_threshold)
-    # print('indices: {0}'.format(indices))
-    # if len(indices) > 0:
-    #     for i in indices:
-    #         box = bbox[i]
-    #         x, y, w, h = box[0], box[1], box[2], box[3]
-    #         cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0))
-    #         label = 'person'
-    #         label = label + ': ' + ('%.4f' % confs[i])
-    #         label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, thickness=3)
-    #         cv2.rectangle(image, (x, y - label_size[1]),
-    #                       (x + label_size[0], y + base_line),
-    #                       (255, 255, 255), cv2.FILLED)
-    #         cv2.putText(image, label.upper(), (x, y),
-    #                     cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 255), thickness=3)
+    indices = cv2.dnn.NMSBoxes(bbox, confs, conf_threshold, nms_threshold)
+    print('indices: {0}'.format(indices))
+    if len(indices) > 0:
+        for i in indices:
+            box = bbox[i]
+            x, y, w, h = box[0], box[1], box[2], box[3]
+            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0))
+            label = 'person'
+            label = label + ': ' + ('%.4f' % confs[i])
+            label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, thickness=3)
+            cv2.rectangle(image, (x, y - label_size[1]),
+                          (x + label_size[0], y + base_line),
+                          (255, 255, 255), cv2.FILLED)
+            cv2.putText(image, label.upper(), (x, y),
+                        cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 255), thickness=3)
     return cox, coy
 
 
-def aroung_ball(motion_service, angle, radius):
+def aroung_ball(motion_service, angle, radius, data):
     count = 0
     angle = math.radians(angle)
-    while count < 6:
+    while count < 6 and data[6] == 0:
         x = radius - radius * math.sin(angle)
         y = radius * math.cos(angle)
-        motion_service.moveTo(x, -y, angle)
+        motion_service.moveTo(polyfit(x), (-y), angle)
         motion_service.waitUntilMoveIsFinished()
         count += 1
 
@@ -280,7 +285,7 @@ def rotate_head(session, data):
         # nếu camera hoạt động là camera dưới
         if data[5] == 1:
             # camera 1
-            focal_length_1 = 895.697546638
+            focal_length_1 = 844.014966275
             # radius of real ball
             radius_real = 0.05
             # tìm khoảng cách đến bóng
@@ -295,14 +300,14 @@ def rotate_head(session, data):
             # bottom = motion_service.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
             # distance = radius_real * focal_length_1 / data[2]
             # distance = math.sqrt(distance ** 2 - bottom[2] ** 2)
-            while (distance > 0.1):
-                motion_service.moveTo(0.05, 0, 0)
+            while (distance > 0.25):
+                motion_service.moveTo(polyfit(0.05), 0, 0)
                 bottom = motion_service.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
                 distance = distance_ball(bottom[2], data[2], radius_real, focal_length_1)
             motion_service.moveTo(0, 0, 0)
             print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, int(data[5])))
             # di chuyển xung quanh bóng
-            aroung_ball(motion_service, 30, distance*2)
+            aroung_ball(motion_service, 30, distance, data)
             # dịch chuyển để sút bóng
             motion_service.moveTo(0, 0.05, 0)
             motion_service.waitUntilMoveIsFinished()
@@ -311,7 +316,7 @@ def rotate_head(session, data):
             return 0
         elif data[5] == 0:
             data[7] = 1
-            motion_service.moveTo(0.5, 0, 0)
+            motion_service.moveTo(polyfit(0.5), 0, 0)
             motion_service.waitUntilMoveIsFinished()
             data[7] = 0
             return 0

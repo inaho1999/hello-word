@@ -6,8 +6,8 @@ session = qi.Session()
 session.connect('tcp://127.0.0.1:9559')
 motionser = session.service("ALMotion")
 posture = session.service('ALRobotPosture')
-distance = 0.3
-angle = math.radians(30)
+distance = 0.8
+angle = math.pi/3
 motionser.wakeUp()
 posture.goToPosture('StandInit', 0.5)
 postion = motionser.getPosition('Torso', motion.FRAME_WORLD, True)
