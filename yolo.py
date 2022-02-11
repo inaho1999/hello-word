@@ -56,6 +56,7 @@ def findmax(listp):
         if max < maxi:
             max = maxi
     indexi = np.where(listp == max)
+    np.asarray(listp == max).nonzero()
     return max, indexi
 
 
@@ -65,12 +66,13 @@ def getImange(ip, port):
     # source = cv2.VideoCapture('video1.avi')
     # source = cv2.VideoCapture('output_human.avi')
     source = cv2.VideoCapture(0)
-    width = int(source.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(source.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    frame_size = (width, height)
-    fps = 24
-    mjpg = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
-    writter = cv2.VideoWriter('detect_human_with_yolo.avi', mjpg, fps, frame_size)
+    # width = int(source.get(cv2.CAP_PROP_FRAME_WIDTH))
+    # height = int(source.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    # frame_size = (width, height)
+    # frame_size = (source.get(cv2.CAP_PROP_FRAME_WIDTH), source.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    # fps = 24
+    # mjpg = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+    # writter = cv2.VideoWriter('detect_human_with_yolo.avi', mjpg, fps, frame_size)
     classid = []
     with open('coco.names', 'r') as coco:
         print('typeof', type(coco))
@@ -136,14 +138,15 @@ def getImange(ip, port):
             detections = net.forward()
             # print(f'detections: {detections.shape}')
             # print(f'detections.shape[0]: {detections[0]}')
-            print(detections.shape)
+            # print(type(detections))
             # print(detections[0])
+            print(detections.shape)
             bbox = []
             confs = []
             new_classid = []
             # Tìm đối tượng xuất hiện trong ảnh
             for detection in detections:
-                if detection[5] > 0.7:
+                if detection[4] > 0.7:
                     print('Tìm thấy 1 người')
                     print(detection)
                     maxi, index = findmax(detection[5:])
@@ -186,98 +189,174 @@ def getImange(ip, port):
             t, _ = net.getPerfProfile()
             label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
             cv2.putText(frame, label, (0, 15), cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(0, 255, 0), thickness=2)
-            writter.write(frame)
+            # writter.write(frame)
             cv2.imshow(winnamed, frame)
 
         # exit by [ESC]
         if cv2.waitKey(1) == 27:
             cv2.cuda.printShortCudaDeviceInfo(cv2.cuda.getDevice())
             source.release()
-            writter.release()
+            # writter.release()
             # video.releaseImage(topcamera)
             # video.unsubscribe(topcamera)
             # motionse.rest()
             break
 
 
-def turnaround():
-    pass
+def find_person(data):
+    source = cv2.VideoCapture(0)
+    classid = []
+    with open('coco.names', 'r') as coco:
+        print('typeof', type(coco))
+        for id in coco:
+            classid.append(id.replace('\n', ''))
+    coco.close()
+    # read network from yolo
+    net = cv2.dnn.readNetFromDarknet('yolov4.cfg', 'yolov4.weights')
+    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+    net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+    # size and confidence threshold
+    size = 608
+    conf_threshold = 0.8
+    nms_threshold = 0.3
 
-
-def detectionHuman():
-    from imutils.object_detection import non_max_suppression
-    # from imutils import paths
-    import numpy as np
-    # import argparse
-    import imutils
-    import cv2
-    # construct the argument parse and parse the arguments
-
-    # cap = cv2.VideoCapture(0)
-    """
-    cap = cv2.VideoCapture(0)
-    while(True):
-        # Capture frame-by-frame
-        ret, frame = cap.read()
-        # Our operations on the frame come here
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # Display the resulting frame
-        cv2.imshow('frame',gray)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+    cox = None
+    coy = None
+    # find net in image
+    while True:
+        has_image, image = source.read()
+        if not has_image:
             break
-    # When everything done, release the capture
-    cap.release()
-    cv2.destroyAllWindows()
-    """
-    """
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-i", "--images", required=True, help="path of image file")
-    args = vars(ap.parse_args())
-    """
-    # initialize the HOG descriptor/person detector
-    hog = cv2.HOGDescriptor()
-    hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
-
-    cap = cv2.VideoCapture(0)
-    # loop over the image paths
-    while (True):
-        # capture frame by frame
-        ret, image = cap.read()
-        image = imutils.resize(image, width=min(400, image.shape[1]))
-        orig = image.copy()
-
-        # detect people in the image
-        (rects, weights) = hog.detectMultiScale(image, winStride=(4, 4),
-                                                padding=(8, 8), scale=1.05)
-
-        # draw the original bounding boxes
-        for (x, y, w, h) in rects:
-            cv2.rectangle(orig, (x, y), (x + w, y + h), (0, 0, 255), 2)
-            print(x, y)
-        # apply non-maxima suppression to the bounding boxes using a
-        # fairly large overlap threshold to try to maintain overlapping
-        # boxes that are still people
-        rects = np.array([[x, y, x + w, y + h] for (x, y, w, h) in rects])
-        pick = non_max_suppression(rects, probs=None, overlapThresh=0.65)
-
-        # draw the final bounding boxes
-        for (xA, yA, xB, yB) in pick:
-            cv2.rectangle(image, (xA, yA), (xB, yB), (0, 255, 0), 2)
-
-        # show some information on the number of bounding boxes
-        # filename = imagePath[imagePath.rfind("/") + 1:]
-        print("[INFO]  {} original boxes, {} after suppression".format(
-            len(rects), len(pick)))
-
-        # show the output images
-        cv2.imshow("Before NMS", orig)
-        cv2.imshow("After NMS", image)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        # size of image
+        frame_height = image.shape[0]
+        frame_width = image.shape[1]
+        blob = cv2.dnn.blobFromImage(image, 1.0 / 255, (size, size), [0, 0, 0], swapRB=False, crop=False)
+        net.setInput(blob)
+        detections = net.forward()
+        bbox = []
+        confs = []
+        new_classid = []
+        for detection in detections:
+            if detection[5] > conf_threshold:
+                maxi = detection[4]
+                # maxi, index = findmax(detection[5:])
+                # index_of_coco = index[0][0]
+                # print(f'detection: {detection}')
+                # print(f'max:{max}, index:{index[0][0]}, name:{classid[index_of_coco]} ')
+                toado = detection[0:4]
+                w, h = int(detection[2] * frame_width), int(detection[3] * frame_height)
+                x, y = int(detection[0] * frame_width - w / 2), int(detection[1] * frame_height - h / 2)
+                cox = x + w / 2
+                coy = y + h / 2
+                bbox.append([x, y, w, h])
+                confs.append(float(maxi))
+                new_classid.append('person')
+        indices = cv2.dnn.NMSBoxes(bbox, confs, conf_threshold, nms_threshold)
+        # print('indices: {0}'.format(indices))
+        if len(indices) > 0:
+            for i in indices:
+                box = bbox[i]
+                x, y, w, h = box[0], box[1], box[2], box[3]
+                cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0))
+                label = 'person'
+                label = label + ': ' + ('%.4f' % confs[i])
+                label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, thickness=3)
+                cv2.rectangle(image, (x, y - label_size[1]),
+                              (x + label_size[0], y + base_line),
+                              (255, 255, 255), cv2.FILLED)
+                cv2.putText(image, label.upper(), (x, y),
+                            cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 255), thickness=3)
+                data[1] = 1
+        else:
+            data[1] = 0
+        cv2.imshow('image', image)
+        if cv2.waitKey(1) == 27:
+            cv2.destroyAllWindows()
+            source.release()
             break
+    return cox, coy
 
-    # When everything done, release the capture
-    cap.release()
-    cv2.destroyAllWindows()
+
+class yolodetect:
+    def __init__(self, weights='yolov4.weights', config='yolov4.cfg', size=608, conf_threshold=0.8, nms_threshold=0.3):
+        self.config = config
+        self.weights = weights
+        self.classid = []
+        with open('coco.names', 'r') as coco:
+            print('typeof', type(coco))
+            for id in coco:
+                self.classid.append(id.replace('\n', ''))
+        coco.close()
+        # read network from yolo
+        self.net = cv2.dnn.readNetFromDarknet(self.config, self.weights)
+        self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+        self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+        # size and confidence threshold
+        self.size = size
+        self.conf_threshold = conf_threshold
+        self.nms_threshold = nms_threshold
+
+    def find_person(self, image):
+        if image is None:
+            print('cannot capture.')
+            return 0, 0
+        elif image[6] is None:
+            print('no image data string.')
+            return 0, 0
+        else:
+            frame = np.reshape(np.frombuffer(image[6], dtype='%iuint8' % image[2]),
+                               (image[1], image[0], image[2]))
+            frame_height = frame.shape[0]
+            frame_width = frame.shape[1]
+
+            # Create a 4D blob from a frame.
+            blob = cv2.dnn.blobFromImage(frame, 1.0 / 255, (self.size, self.size), [0, 0, 0], swapRB=False, crop=False)
+            # Run a model
+            self.net.setInput(blob)
+            detections = self.net.forward()
+            print(detections.shape)
+            bbox = []
+            confs = []
+            new_classid = []
+            # Tìm đối tượng xuất hiện trong ảnh
+            for detection in detections:
+                if detection[5] > 0.7:
+                    # print('Tìm thấy 1 người')
+                    # print(detection)
+                    maxi, index = findmax(detection[5:])
+                    index_of_coco = index[0][0]
+                    # index_of_coco = 0
+                    # print('detection: {0}'.format(detection))
+                    # print('maxima:{0}, index:{1}, name:{2} '.format(max, index[0][0], classid[index_of_coco]))
+                    toado = detection[0:4]
+                    w, h = int(detection[2] * frame_width), int(detection[3] * frame_height)
+                    x, y = int(detection[0] * frame_width - w / 2), int(detection[1] * frame_height - h / 2)
+                    bbox.append([x, y, w, h])
+                    confs.append(float(maxi))
+                    new_classid.append(self.classid[index_of_coco])
+
+            indices = cv2.dnn.NMSBoxes(bbox, confs, self.conf_threshold, self.nms_threshold)
+            # print('indices: {0}'.format(indices))
+            if len(indices) > 0:
+                for i in indices:
+                    box = bbox[i]
+                    x, y, w, h = box[0], box[1], box[2], box[3]
+                    return x + w / 2, y + h / 2
+                    # cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0))
+                    # label = self.classid[index_of_coco]
+                    # label = label + ': ' + ('%.4f' % confs[i])
+                    # label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, thickness=3)
+                    # cv2.rectangle(frame, (x, y - label_size[1]),
+                    #               (x + label_size[0], y + base_line),
+                    #               (255, 255, 255), cv2.FILLED)
+                    # cv2.putText(frame, label.upper(), (x, y),
+                    #             cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 255), thickness=3)
+            # t, _ = self.net.getPerfProfile()
+            # label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
+            # cv2.putText(frame, label, (0, 15), cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(0, 255, 0), thickness=2)
+            # writter.write(frame)
+            # cv2.imshow(winnamed, frame)
+            return 0, 0
 
 
 if __name__ == '__main__':
@@ -286,9 +365,13 @@ if __name__ == '__main__':
                         help="Robot IP address. On robot or Local Naoqi: use '127.0.0.1'.")
     parser.add_argument("--port", type=int, default=9559,
                         help="Naoqi port number")
-    session = 1
     args = parser.parse_args()
     # session = qi.Session() try: session.connect("tcp://" + args.ip + ":" + str(args.port)) except RuntimeError:
     # print ("Can't connect to Naoqi at ip " + args.ip + " at port " + str(args.port) + "\nPlease check your script "
     # "arguments. Run with -h option " "for help.") sys.exit(1)
-    getImange(args.ip, args.port)
+    # getImange(args.ip, args.port)
+    # source = cv2.VideoCapture(0)
+    # while True:
+    #     frame, has_frame = source.read()
+
+    find_person()

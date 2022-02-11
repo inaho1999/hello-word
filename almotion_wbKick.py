@@ -44,7 +44,7 @@ def computePath(motion_service, effector, frame):
     return path
 
 
-def main(motion_service):
+def main(motion_service, posture_service):
     """
     Example of a whole body kick.
     Warning: Needs a PoseInit before executing
@@ -125,11 +125,10 @@ def main(motion_service):
     motion_service.wbEnable(isEnabled)
 
     # send robot to Pose Init
-    #posture_service.goToPosture("StandInit", 0.3)
+    posture_service.goToPosture("StandInit", 0.3)
 
     # Go to rest position
     #motion_service.rest()
-    print(motion_service.getBodyNames("Body"))
 
 
 if __name__ == "__main__":

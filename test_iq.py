@@ -9,10 +9,10 @@ import math
 import almath
 import motion as mot
 
-posture = ALProxy("ALRobotPosture", "192.168.140.245", 9559)
-motion = ALProxy("ALMotion", "192.168.140.245", 9559)
-tts = ALProxy("ALTextToSpeech", "192.168.140.245", 9559)
-video = ALProxy("ALVideoDevice", "192.168.140.245", 9559)
+posture = ALProxy("ALRobotPosture", "127.0.0.1", 9559)
+motion = ALProxy("ALMotion", "127.0.0.1", 9559)
+tts = ALProxy("ALTextToSpeech", "127.0.0.1", 9559)
+video = ALProxy("ALVideoDevice", "127.0.0.1", 9559)
 
 motion.wakeUp()
 # motion.angleInterpolationWithSpeed("HeadPitch", [0.5, 0.035], 0.1)

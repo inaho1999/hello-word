@@ -100,8 +100,7 @@ def getImange(data):
                         elif data[5] == 1:
                             distance = distance_ball(height_1, radius, 0.05, focal_length_1)
                         cv.rectangle(image_top, (int(cox1), int(coy1)), (int(cox1 + w), int(coy1 + h)), (0, 0, 255), 2)
-                        gocquay = (abs(float(
-                            cx) - 320.0)) / 640.0 * 67.4 * almath.TO_RAD  # Tính góc quay cần thiết của robot
+                        gocquay = (abs(float(cx) - 320.0)) / 640.0 * 67.4 * almath.TO_RAD  # Tính góc quay cần thiết của robot
                         # dưới dạng radian
                         if cx > 320:
                             gocquay = - gocquay
@@ -171,12 +170,12 @@ def find_person(image):
             classid.append(id.replace('\n', ''))
     coco.close()
     # read network from yolo
-    net = cv2.dnn.readNetFromDarknet('yolov4-tiny.cfg', 'yolov4-tiny.weights')
-    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-    net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+    net = cv2.dnn.readNetFromDarknet('yolov4.cfg', 'yolov4.weights')
+    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+    net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
     # size and confidence threshold
-    size = 416
-    conf_threshold = 0.9
+    size = 608
+    conf_threshold = 0.8
     nms_threshold = 0.7
     # size of image
     frame_height = image.shape[0]
@@ -193,7 +192,9 @@ def find_person(image):
     coy = None
     for detection in detections:
         if detection[5] > conf_threshold:
-            maxi, index = findmax(detection[5:])
+            maxi = detection[5]
+            index = 5
+            # maxi, index = findmax(detection[5:])
             # index_of_coco = index[0][0]
             # print(f'detection: {detection}')
             # print(f'max:{max}, index:{index[0][0]}, name:{classid[index_of_coco]} ')
@@ -206,16 +207,16 @@ def find_person(image):
             bbox.append([x, y, w, h])
             confs.append(float(maxi))
             new_classid.append('person')
-            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0))
-            label = 'person'
-            label = label + ': ' + ('%.4f' % maxi)
-            label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, thickness=3)
-            cv2.rectangle(image, (x, y - label_size[1]),
-                          (x + label_size[0], y + base_line),
-                          (255, 255, 255), cv2.FILLED)
-            cv2.putText(image, label.upper(), (x, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 255), thickness=3)
-            break
+            # cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0))
+            # label = 'person'
+            # label = label + ':' + ('%.4f' % maxi)
+            # label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, thickness=3)
+            # cv2.rectangle(image, (x, y - label_size[1]),
+            #               (x + label_size[0], y + base_line),
+            #               (255, 255, 255), cv2.FILLED)
+            # cv2.putText(image, label.upper(), (x, y),
+            #             cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 255), thickness=3)
+            # break
     indices = cv2.dnn.NMSBoxes(bbox, confs, conf_threshold, nms_threshold)
     print('indices: {0}'.format(indices))
     if len(indices) > 0:
