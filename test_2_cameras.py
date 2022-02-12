@@ -1,4 +1,6 @@
 # coding=utf-8
+import time
+
 from naoqi import ALProxy
 import cv2
 import numpy as np
@@ -57,6 +59,15 @@ def getImages(ip, port, data):
                         cox = int(x)
                         coy = int(y)
                         cv2.circle(image0, (cox, coy), int(radius), (220, 0, 255), 3)
+                        percent = 0
+                        for toado in contour:
+                            xcnt = toado[0][0]
+                            ycnt = toado[0][1]
+                            rho = math.sqrt(pow(x-xcnt, 2)+pow(y-ycnt, 2))
+                            if percent < abs(rho - radius)/radius:
+                                percent = abs(rho - radius)/radius
+                        if percent > 0.1:
+                            continue
                         # Tính góc quay cần thiết của robot dưới dạng radian
                         gocquay = (abs(float(cox) - 320.0)) / 640.0 * 60.9 * almath.TO_RAD
                         if cox > 320:
@@ -72,6 +83,15 @@ def getImages(ip, port, data):
                         (x, y), radius = cv2.minEnclosingCircle(contour)
                         cox = int(x)
                         coy = int(y)
+                        percent = 0
+                        for toado in contour:
+                            xcnt = toado[0][0]
+                            ycnt = toado[0][1]
+                            rho = math.sqrt(pow(x - xcnt, 2) + pow(y - ycnt, 2))
+                            if percent < abs(rho - radius) / radius:
+                                percent = abs(rho - radius) / radius
+                        if percent > 0.1:
+                            continue
                         cv2.circle(image1, (cox, coy), int(radius), (220, 0, 255), 3)
                         # Tính góc quay cần thiết của robot dưới dạng radian
                         gocquay = (abs(float(cox) - 320.0)) / 640.0 * 60.9 * almath.TO_RAD
@@ -141,6 +161,7 @@ def ControlNao(ALmotion, ALPosture, ALCam, topcamera):
     # Robot quay góc pi/3 để tìm bóng
     ALmotion.moveInit()
     ALmotion.angleInterpolationWithSpeed('Head', [0, 0.30], 0.2)
+    time.sleep(1)
     if data[3] == -1100:
         print('Bắt đầu tìm bóng')
         ALmotion.moveTo(0, 0, math.pi / 3)
@@ -175,19 +196,19 @@ def ControlNao(ALmotion, ALPosture, ALCam, topcamera):
                 bottom = ALmotion.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
                 distance = distance_ball(bottom[2], data[2], radius_real, focal_length_1)
                 print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, int(data[5])))
-            while not ALmotion.stopMove():
-                print("Chưa dừng lại")
+            if ALmotion.stopMove():
+                print('Đã dừng')
             print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, int(data[5])))
             # image = ALCam.getImageRemote(topcamera)
-            if data[1] == 1:
+            if True:
                 print("Đá bóng")
-                ALmotion.moveTo(0.1, 0.1, 0)
+                ALmotion.moveTo(0.2, 0.15, 0)
                 ALmotion.waitUntilMoveIsFinished()
                 kb.main(ALmotion, ALPosture)
                 return 0
             # di chuyển xung quanh bóng
-            aroung_ball(ALmotion, math.pi / 6, distance)
-            return 0
+            # aroung_ball(ALmotion, math.pi / 6, distance)
+            # return 0
 
         elif data[5] == 0:
             data[7] = 1
@@ -221,10 +242,10 @@ if __name__ == '__main__':
     data[6] = 0
     data[1] = 0
     thread_image = mlti.Process(target=getImages, args=(ip, port, data))
-    thread_yolo = mlti.Process(target=yolo.find_person, args=(data,))
+    # thread_yolo = mlti.Process(target=yolo.find_person, args=(data,))
     thread_image.start()
-    thread_yolo.start()
+    # thread_yolo.start()
     declareALproxy(args.ip, args.port, data)
     thread_image.join()
-    thread_yolo.join()
+    # thread_yolo.join()
     print('Kết thúc chương trình')

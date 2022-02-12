@@ -12,9 +12,9 @@ import almath
 
 
 def computePath(motion_service, effector, frame):
-    dx      = 0.12                 # translation axis X (meters)
-    dz      = 0.08                 # translation axis Z (meters)
-    dwy     = 10.0*almath.TO_RAD    # rotation axis Y (radian)
+    dx = 0.05 # translation axis X (meters)
+    dz = 0.05  # translation axis Z (meters)
+    dwy = 10.0 * almath.TO_RAD  # rotation axis Y (radian)
 
     useSensorValues = False
 
@@ -22,20 +22,24 @@ def computePath(motion_service, effector, frame):
     currentTf = []
     try:
         currentTf = motion_service.getTransform(effector, frame, useSensorValues)
+        print("curent: {0}".format(currentTf))
     except Exception, errorMsg:
         print str(errorMsg)
         print "This example is not allowed on this robot."
         exit()
 
     # 1
-    targetTf  = almath.Transform(currentTf)
-    targetTf *= almath.Transform(-dx+0.1, 0.0, dz)
+    targetTf = almath.Transform(currentTf)
+    targetTf *= almath.Transform(-dx, 0.0, dz)
     targetTf *= almath.Transform().fromRotY(dwy)
     path.append(list(targetTf.toVector()))
+    print("target1: {0}".format(targetTf))
+    print("target1: {0}".format(targetTf.toVector()))
 
     # 2
-    targetTf  = almath.Transform(currentTf)
-    targetTf *= almath.Transform(dx, 0.0, dz)
+    targetTf = almath.Transform(currentTf)
+    targetTf *= almath.Transform(dx + 0.06, 0.0, dz)
+    # targetTf *= almath.Transform().fromRotY(dwy)
     path.append(list(targetTf.toVector()))
 
     # 3
@@ -51,16 +55,6 @@ def main(motion_service, posture_service):
              Whole body balancer must be inactivated at the end of the script.
     This example is only compatible with NAO.
     """
-    # Get the services ALMotion & ALRobotPosture.
-
-    #motion_service = session.service("ALMotion")
-    #posture_service = session.service("ALRobotPosture")
-
-    # Wake up robot
-    #motion_service.wakeUp()
-
-    # Send robot to Stand Init
-    #posture_service.goToPosture("StandInit", 0.5)
 
     # Activate Whole Body Balancer
     isEnabled  = True
@@ -74,13 +68,13 @@ def main(motion_service, posture_service):
     # Constraint Balance Motion
     isEnable   = True
     supportLeg = "Legs"
-    #motion_service.wbEnableBalanceConstraint(isEnable, supportLeg)
+    motion_service.wbEnableBalanceConstraint(isEnable, supportLeg)
 
     # Com go to LLeg
     supportLeg = "LLeg"
     duration   = 2.0
     motion_service.wbGoToBalance(supportLeg, duration)
-    motion_service.wbEnableBalanceConstraint(isEnable, supportLeg)
+    # motion_service.wbEnableBalanceConstraint(isEnable, supportLeg)
     # RLeg is free
     stateName  = "Free"
     supportLeg = "RLeg"
@@ -92,32 +86,14 @@ def main(motion_service, posture_service):
     frame    = mt.FRAME_WORLD
 
     # Motion of the RLeg
-    times   = [2.0, 2.5, 4.2]
+    # times   = [2.0, 2.7, 4.2]
+    times = [1.0, 1.4, 2.1]
     #tính toán quỹ đạo của chân và đá bóng
     path = computePath(motion_service, effector, frame)
-    isActive = False
-    motion_service.wbEnableEffectorOptimization(effector, isActive)
+    isActive = True
+    # motion_service.wbEnableEffectorOptimization("RLeg", True)
+
     motion_service.transformInterpolations(effector, frame, path, axisMask, times)
-    '''
-    # Example showing how to Enable Effector Control as an Optimization
-    isActive     = False
-    motion_service.wbEnableEffectorOptimization(effector, isActive)
-
-    # Com go to LLeg
-    supportLeg = "RLeg"
-    duration   = 2.0
-    motion_service.wbGoToBalance(supportLeg, duration)
-    motion_service.wbEnableBalanceConstraint(isEnable, supportLeg)
-
-    # RLeg is free
-    stateName  = "Free"
-    supportLeg = "LLeg"
-    motion_service.wbFootState(stateName, supportLeg)
-
-    effector = "LLeg"
-    path = computePath(motion_service, effector, frame)
-    motion_service.transformInterpolations(effector, frame, path, axisMask, times)
-    '''
     time.sleep(1.0)
 
     # Deactivate Head tracking
@@ -127,15 +103,13 @@ def main(motion_service, posture_service):
     # send robot to Pose Init
     posture_service.goToPosture("StandInit", 0.3)
 
-    # Go to rest position
-    #motion_service.rest()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--ip", type=str, default="127.0.0.1",
                         help="Robot IP address. On robot or Local Naoqi: use '127.0.0.1'.")
-    parser.add_argument("--port", type=int, default=9560,
+    parser.add_argument("--port", type=int, default=9559,
                         help="Naoqi port number")
 
     args = parser.parse_args()
@@ -151,6 +125,6 @@ if __name__ == "__main__":
     posture = session.service('ALRobotPosture')
     motion.wakeUp()
     posture.goToPosture('StandInit', 0.5)
-    main(motion)
+    main(motion, posture)
     posture.goToPosture('StandInit', 0.5)
     motion.rest()
