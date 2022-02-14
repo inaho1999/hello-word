@@ -36,8 +36,14 @@ def getImages(ip, port, data):
                                 (images[1][1], images[1][0], images[1][2]))
             hsv0 = cv2.cvtColor(image0, cv2.COLOR_BGR2HSV)
             hsv1 = cv2.cvtColor(image1, cv2.COLOR_BGR2HSV)
+            # trong webots
             mask0 = cv2.inRange(hsv0, (0, 129, 204), (0, 255, 255))
             mask1 = cv2.inRange(hsv1, (0, 129, 204), (0, 255, 255))
+            # # robot thật
+            # # camera trên
+            # mask1 = cv2.inRange(hsv1, (154, 88, 94), (179, 255, 255))
+            # # camera dưới
+            # mask1 = cv2.inRange(hsv1, (154, 88, 94), (179, 255, 255))
             contours0, hier0 = cv2.findContours(mask0, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             contours1, hier1 = cv2.findContours(mask1, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             found_ball = False
@@ -56,7 +62,7 @@ def getImages(ip, port, data):
                             rho = math.sqrt(pow(x-xcnt, 2)+pow(y-ycnt, 2))
                             if percent < abs(rho - radius)/radius:
                                 percent = abs(rho - radius)/radius
-                        if percent > 0.3:
+                        if percent > 0.5:
                             continue
                         # Tính góc quay cần thiết của robot dưới dạng radian
                         gocquay = (abs(float(cox) - 320.0)) / 640.0 * 60.9 * almath.TO_RAD
