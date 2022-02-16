@@ -11,8 +11,7 @@ import argparse
 import multiprocessing as mlti
 import motion
 import almotion_wbKick as kb
-import yolo
-from yolo import yolodetect
+
 
 
 def turnBall(gocquay, x):
