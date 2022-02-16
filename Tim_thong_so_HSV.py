@@ -16,7 +16,7 @@ def none(x):
 
 
 def getImange():
-    source = cv2.VideoCapture("new_Trim.mp4")
+    source = cv2.VideoCapture("video-1644677362.mp4")
     frame = source.get(cv2.CAP_PROP_FRAME_COUNT)
     # image_top = cv2.imread("new.png")
     winnamed = "redball"

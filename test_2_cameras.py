@@ -11,10 +11,24 @@ import argparse
 import multiprocessing as mlti
 import motion
 import almotion_wbKick as kb
+import yolo
+from yolo import yolodetect
+
+
+def turnBall(gocquay, x):
+    if 300 > x > 340:
+        return gocquay
+    elif abs(gocquay) < math.pi / 180:
+        return gocquay
+    elif x > 320 and gocquay > math.pi / 180:
+        return -math.pi / 180
+    elif x < 320 and gocquay > math.pi / 180:
+        return math.pi / 180
+    else:
+        return gocquay
 
 
 def getImages(ip, port, data):
-    #
     videos = ALProxy('ALVideoDevice', ip, port)
     Name = 'test2camera'
     CameraIndexs = (0, 1)
@@ -36,21 +50,14 @@ def getImages(ip, port, data):
                                 (images[1][1], images[1][0], images[1][2]))
             hsv0 = cv2.cvtColor(image0, cv2.COLOR_BGR2HSV)
             hsv1 = cv2.cvtColor(image1, cv2.COLOR_BGR2HSV)
-            # trong webots
             mask0 = cv2.inRange(hsv0, (0, 129, 204), (0, 255, 255))
             mask1 = cv2.inRange(hsv1, (0, 129, 204), (0, 255, 255))
-            # # robot thật
-            # # camera trên
-            # mask1 = cv2.inRange(hsv1, (154, 88, 94), (179, 255, 255))
-            # # camera dưới
-            # mask1 = cv2.inRange(hsv1, (154, 88, 94), (179, 255, 255))
             contours0, hier0 = cv2.findContours(mask0, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             contours1, hier1 = cv2.findContours(mask1, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            found_ball = False
             if len(contours0) > 0:
                 data[5] = 0
                 for contour in contours0:
-                    if cv2.contourArea(contour) > 100:
+                    if cv2.contourArea(contour) > 50:
                         (x, y), radius = cv2.minEnclosingCircle(contour)
                         cox = int(x)
                         coy = int(y)
@@ -59,25 +66,26 @@ def getImages(ip, port, data):
                         for toado in contour:
                             xcnt = toado[0][0]
                             ycnt = toado[0][1]
-                            rho = math.sqrt(pow(x-xcnt, 2)+pow(y-ycnt, 2))
-                            if percent < abs(rho - radius)/radius:
-                                percent = abs(rho - radius)/radius
-                        if percent > 0.5:
+                            rho = math.sqrt(pow(x - xcnt, 2) + pow(y - ycnt, 2))
+                            if percent < abs(rho - radius) / radius:
+                                percent = abs(rho - radius) / radius
+                        if percent > 0.3:
                             continue
                         # Tính góc quay cần thiết của robot dưới dạng radian
                         gocquay = (abs(float(cox) - 320.0)) / 640.0 * 60.9 * almath.TO_RAD
                         if cox > 320:
                             gocquay = -gocquay
+                        gocquay = turnBall(gocquay, cox)
+                        # print("gocquay và coy: {0} và {1}".format(gocquay*almath.TO_DEG, coy))
                         data[0] = gocquay
                         data[2] = radius
                         data[3] = 1100
-                        found_ball = True
-                        break
+                        data[4] = coy
                         # print(x, y)
-            elif len(contours1) > 0 and found_ball is False:
+            elif len(contours1) > 0:
                 data[5] = 1
                 for contour in contours1:
-                    if cv2.contourArea(contour) > 100:
+                    if cv2.contourArea(contour) > 50:
                         (x, y), radius = cv2.minEnclosingCircle(contour)
                         cox = int(x)
                         coy = int(y)
@@ -95,15 +103,19 @@ def getImages(ip, port, data):
                         gocquay = (abs(float(cox) - 320.0)) / 640.0 * 60.9 * almath.TO_RAD
                         if cox > 320:
                             gocquay = -gocquay
+                        gocquay = turnBall(gocquay, cox)
+                        # print("gocquay và coy: {0} và {1}".format(gocquay*almath.TO_DEG, coy))
                         data[0] = gocquay
                         data[2] = radius
                         data[3] = 1100
-                        break
+                        data[4] = coy
                         # print(x, y)
             else:
                 print('Không tìm thấy bóng')
                 data[5] = 2
                 data[3] = -1100
+            cv2.circle(image0, (320, 240), 2, (221, 100, 100), 3)
+            cv2.circle(image1, (320, 240), 2, (221, 100, 100), 3)
             cv2.imshow('camera0', image0)
             cv2.imshow('camera1', image1)
         if cv2.waitKey(1) == 27:
@@ -112,6 +124,14 @@ def getImages(ip, port, data):
     cv2.destroyAllWindows()
     videos.releaseImages(twocameras)
     videos.unsubscribe(twocameras)
+
+
+def polyfit(walk):
+    a1 = 1.318649524
+    a0 = -0.009062442
+    walk = walk * a1 + a0
+    return walk
+
 
 def distance_ball(height, radius_pixel, radius_real, focal_length):
     distance = radius_real * focal_length / radius_pixel
@@ -125,84 +145,104 @@ def distance_ball(height, radius_pixel, radius_real, focal_length):
 def aroung_ball(motion_service, angle, radius):
     x = radius - radius * math.sin(angle)
     y = radius * math.cos(angle)
-    motion_service.moveTo(x, (-y), angle)
+    motion_service.moveTo(polyfit(x), (-y), angle)
     motion_service.waitUntilMoveIsFinished()
 
 
 def declareALproxy(ip, port, data):
     ALmotion = ALProxy('ALMotion', ip, port)
     ALPosture = ALProxy('ALRobotPosture', ip, port)
+    # ALCam = ALProxy("ALVideoDevice", ip, port)
+    # resolution = vision_definitions.kVGA
+    # colorSpace = vision_definitions.kBGRColorSpace
+    # fps = 20
+    # ALCam.setActiveCamera(0)
+    # topcamera = ALCam.subscribe("yolo", resolution, colorSpace, fps)
+    ALCam = 0
+    topcamera = 1
     while data[6] == 0:
-        ControlNao(ALmotion, ALPosture)
+        ControlNao(ALmotion, ALPosture, ALCam, topcamera)
 
 
-def ControlNao(ALmotion, ALPosture):
-    # Đánh thức robot
+def ControlNao(ALmotion, ALPosture, ALCam, topcamera):
     if not ALmotion.robotIsWakeUp():
         print('Đánh thức robot')
         ALmotion.wakeUp()
         ALPosture.goToPosture('StandInit', 0.5)
-    # Robot vào tư thế chuẩn bị di chuyển
+    # Robot quay góc pi/3 để tìm bóng
     ALmotion.moveInit()
     ALmotion.setMoveArmsEnabled(True, True)
     ALmotion.angleInterpolationWithSpeed('Head', [0, 0.30], 0.2)
-    # Robot quay góc pi/3 để tìm bóng
     time.sleep(1)
     if data[3] == -1100:
         print('Bắt đầu tìm bóng')
         ALmotion.moveTo(0, 0, math.pi / 3)
         ALmotion.waitUntilMoveIsFinished()
         return 0
-    # Robot chỉnh bóng về giữa khung hình
+        # Robot chỉnh bóng về giữa khung hình
     elif data[3] == 1100 and abs(data[0]) >= math.pi / 180:
         print('Hiệu chỉnh góc quay của robot')
         while abs(data[0]) >= math.pi / 180 and data[6] == 0:
+            print("gocquay: {0}".format(data[0] * almath.TO_DEG))
             ALmotion.moveTo(0, 0, data[0])
         ALmotion.moveTo(0, 0, 0)
         return 0
-    # Robot tiếp cận và đá bóng
     elif data[3] == 1100 and abs(data[0]) <= math.pi / 180:
         print('Đi đến vị trí bóng, camera {0}:'.format(int(data[5])))
         if data[5] == 1:
-            # camera 1 focal length
+            # camera 1
             focal_length_1 = 844.014966275
-            # Bán kính thực của bóng đơn vị SI
+            # radius of real ball
             radius_real = 0.05
             # tìm khoảng cách đến bóng
-            bottom = ALmotion.getPosition('CameraBottom', motion.FRAME_ROBOT, True)     # Chiều cao của camera dưới
-            distance = distance_ball(bottom[2], data[2], radius_real, focal_length_1)   # Tính khoảng cách của robot đến bóng
+            bottom = ALmotion.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
+            distance = distance_ball(bottom[2], data[2], radius_real, focal_length_1)
             print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, int(data[5])))
-            # điều chỉnh khoảng cách bóng và robot ít hơn 0.25m
-            while distance > 0.25:
-                ALmotion.moveTo(0.02, 0, 0)
-                bottom = ALmotion.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
-                distance = distance_ball(bottom[2], data[2], radius_real, focal_length_1)
-                print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, int(data[5])))
-            # điều chỉnh khoảng cách bóng và robot lớn hơn 0.2m
-            while distance < 0.2:
-                ALmotion.moveTo(-0.02, 0, 0)
-                bottom = ALmotion.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
-                distance = distance_ball(bottom[2], data[2], radius_real, focal_length_1)
-                print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, int(data[5])))
+            # while (distance > 0.25):
+            #     ALmotion.moveTo(polyfit(distance - 0.25), 0, 0)
+            #     bottom = ALmotion.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
+            #     distance = distance_ball(bottom[2], data[2], radius_real, focal_length_1)
+            #     print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, int(data[5])))
+            # while (distance < 0.2):
+            #     ALmotion.moveTo(-0.02, 0, 0)
+            #     bottom = ALmotion.getPosition('CameraBottom', motion.FRAME_ROBOT, True)
+            #     distance = distance_ball(bottom[2], data[2], radius_real, focal_length_1)
+            #     print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, int(data[5])))
+            while not (390 < data[4] < 410) and data[6] == 0:
+                if data[4] > 410:
+                    print("lùi")
+                    ALmotion.moveTo(-0.01, 0, 0)
+                    ALmotion.waitUntilMoveIsFinished()
+                if data[4] < 390:
+                    if data[4] < 350:
+                        print("tiến")
+                        ALmotion.moveTo(0.2, 0, 0)
+                        ALmotion.waitUntilMoveIsFinished()
+                    else:
+                        print("tiến")
+                        ALmotion.moveTo(0.01, 0, 0)
+                        ALmotion.waitUntilMoveIsFinished()
             if ALmotion.stopMove():
                 print('Đã dừng')
             print('khoang cach distance: {0}, sử dụng camera: {1}'.format(distance, int(data[5])))
             # image = ALCam.getImageRemote(topcamera)
-            if data[0] > math.pi/180:
+            if data[0] > math.pi / 180:
                 return 0
-            if True:
+            if data[6] == 0:
                 print("Đá bóng")
-                ALmotion.moveTo(0.2, 0.15, 0)
+                ALmotion.moveTo(0, 0.1, 0)
                 ALmotion.waitUntilMoveIsFinished()
                 kb.main(ALmotion, ALPosture)
                 return 0
             # di chuyển xung quanh bóng
             # aroung_ball(ALmotion, math.pi / 6, distance)
             # return 0
-        # Nếu bóng ở camera trên thì tiếp cận từng đoạn 0.5m
+
         elif data[5] == 0:
-            ALmotion.moveTo(0.5, 0, 0)
+            data[7] = 1
+            ALmotion.moveTo(polyfit(0.5), 0, 0)
             ALmotion.waitUntilMoveIsFinished()
+            data[7] = 0
             return 0
 
 
@@ -226,11 +266,13 @@ if __name__ == '__main__':
     data[6]: báo hiệu dừng chương trình
     data[7]: robot đang di chuyển về phía bóng
     '''
-    data[4] = 0
     data[6] = 0
     data[1] = 0
     thread_image = mlti.Process(target=getImages, args=(ip, port, data))
+    # thread_yolo = mlti.Process(target=yolo.find_person, args=(data,))
     thread_image.start()
+    # thread_yolo.start()
     declareALproxy(args.ip, args.port, data)
     thread_image.join()
+    # thread_yolo.join()
     print('Kết thúc chương trình')
